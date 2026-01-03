@@ -16,7 +16,8 @@ spec:
     spec:
       containers:
       - name: simpliroute-engine
-        image: gcr.io/your-project-id/simpliroute-engine:latest
+        image: simpliroute-engine:v1
+        imagePullPolicy: Never
         ports:
         - containerPort: 8000
         resources:
