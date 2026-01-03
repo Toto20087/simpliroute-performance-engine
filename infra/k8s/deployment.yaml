@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: simpliroute-engine
+  labels:
+    app: simpliroute-engine
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: simpliroute-engine
+  template:
+    metadata:
+      labels:
+        app: simpliroute-engine
+    spec:
+      containers:
+      - name: simpliroute-engine
+        image: gcr.io/your-project-id/simpliroute-engine:latest
+        ports:
+        - containerPort: 8000
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "250m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 10
