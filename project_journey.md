@@ -33,9 +33,15 @@
 *   **Docker**: Contenedorización de la aplicación para un contexto de ejecución consistente.
 *   **Kubernetes (K8s)**: Definición de Infraestructura Declarativa (Deployments, Services) para capacidades escalables.
 
-### 5. Diseño de Sistemas Resilientes
-*   **Estrategias de Fallback**: Diseño de un sistema que se degrada elegantemente de una API Cloud a un Solucionador Local si la red falla.
-*   **Observabilidad**: Implementación de Decoradores para registrar tiempo de ejecución y métricas de rendimiento.
+### 6. Arquitectura Asíncrona (SimpliRoute Stack)
+*   **Celery + Redis**: Desacoplamiento de la lógica de optimización pesada usando una cola de tareas distribuida.
+*   **Patrón de Polling**: Implementación de un flujo robusto "Async Request-Reply" donde el frontend consulta el estado de la tarea.
+*   **Stateless API**: Diseño inteligente donde la API delega el estado (nombres de direcciones) al cliente para simplificar la infraestructura.
+
+### 7. Frontend Moderno (React 2.0)
+*   **Vite + React + TypeScript**: Migración de Streamlit a un stack profesional de Single Page Application (SPA).
+*   **Tailwind CSS + Shadcn UI**: Adopción de estándares de industria para un diseño visual de "Producto SaaS AAA".
+*   **React Query**: Manejo elegante del estado asíncrono y polling automático.
 
 ---
 
@@ -45,18 +51,18 @@
 *   **Problema**: La API VRP externa devolvía errores `500` impredecibles durante las pruebas de carga.
 *   **Solución**: Pivotamos a una **Estrategia de Motor Local**. Implementamos Google OR-Tools directamente dentro del microservicio. Esto eliminó la dependencia de red y redujo la latencia a **< 50ms**.
 
-### Desafío 2: Manejo Dinámico del Depósito
-*   **Problema**: El solucionador necesitaba saber *exactamente* dónde comenzaba el camión, pero la entrada del usuario no estaba estructurada.
-*   **Solución**: Refactorizamos el modelo de datos para soportar una **Definición Explícita del Depósito** en el payload JSON, fusionándolo inteligentemente con las paradas de entrega antes de resolver.
+### Desafío 2: Bloqueo del Event Loop (CPU Bound)
+*   **Problema**: Al correr optimizaciones pesadas en FastAPI, el servidor dejaba de responder a otras peticiones.
+*   **Solución**: Implementamos **Celery Workers**. Movimos el cálculo matemático a un proceso separado, permitiendo que la API maneje miles de requests concurrentes sin bloquearse.
 
-### Desafío 3: Estimación de Tiempo Real
-*   **Problema**: Conocer la distancia no era suficiente; necesitábamos saber *cuánto tiempo* tomaría la entrega.
-*   **Solución**: Implementamos una capa de estimación basada en física (`Tiempo = Distancia / Velocidad Promedio`), asumiendo un promedio urbano de 25km/h, proporcionando métricas accionables al usuario.
+### Desafío 3: Build de Frontend Moderno
+*   **Problema**: Conflictos de versiones entre React 19, Tailwind v4 y librerías de UI causaron fallas críticas en el build de Docker.
+*   **Solución**: Aplicamos ingeniería inversa a los logs de error, degradamos a versiones estables (Tailwind v3.4) y configuramos explícitamente los tipos de TypeScript (`vite-env.d.ts`), logrando un build robusto y reproducible.
 
 ---
 
 ## 💼 Por Qué Esto Importa (La Perspectiva "Senior")
 Este proyecto demuestra más que solo código; demuestra **Madurez Ingenieril**.
-1.  **Funciona offline**: No es solo un wrapper de una API; es un motor independiente.
-2.  **Es escalable**: La arquitectura (K8s + Async) lo deja listo cargas de producción.
-3.  **Aporta valor**: La visualización 3D traduce matemática compleja en insights de negocio.
+1.  **Full Stack Real**: Desde la matemática del backend (Python/OR-Tools) hasta la estética del frontend (React/Tailwind).
+2.  **Arquitectura Distribuida**: Uso correcto de Colas de Tareas (Celery) para escalabilidad horizontal.
+3.  **Resiliencia**: Manejo de errores de build, Dockerización multicapa y patrones de diseño robustos.

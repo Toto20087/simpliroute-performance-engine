@@ -36,17 +36,12 @@ services:
     depends_on:
       - redis
 
-  # 4. The Frontend (Streamlit)
+  # 4. The Frontend (React + Vite)
   frontend:
     build:
-      context: .
-      dockerfile: infra/docker/Dockerfile
-    command: streamlit run src/frontend/app.py
-    volumes:
-      - .:/app
+      context: ./src/frontend-react
+      dockerfile: Dockerfile
     ports:
-      - "8501:8501"
-    environment:
-      - API_URL=http://api:8000/api/v1/optimize
+      - "8501:80"
     depends_on:
       - api
