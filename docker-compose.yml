@@ -1,0 +1,52 @@
+services:
+  # 1. Message Broker (The Mailbox)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  # 2. The API (FastAPI)
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile
+    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - redis
+
+  # 3. The Worker (Background Processor)
+  worker:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile
+    command: celery -A src.celery_worker.celery_app worker --loglevel=info
+    volumes:
+      - .:/app
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - PYTHONPATH=/app
+    depends_on:
+      - redis
+
+  # 4. The Frontend (Streamlit)
+  frontend:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile
+    command: streamlit run src/frontend/app.py
+    volumes:
+      - .:/app
+    ports:
+      - "8501:8501"
+    environment:
+      - API_URL=http://api:8000/api/v1/optimize
+    depends_on:
+      - api

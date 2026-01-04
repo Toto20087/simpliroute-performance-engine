@@ -1,105 +1,78 @@
-import asyncio
 import uuid
-import time
 import logging
-from typing import List
-from fastapi import APIRouter
-from src.api.models import OptimizationRequest, OptimizationResponse
+from fastapi import APIRouter, HTTPException, Depends
+from src.api.models import OptimizationRequest, OptimizationResponse, TaskResponse, TaskResult
 from src.core.decorators import monitor_performance
-from src.core.context_managers import MockStorageConnection
-from src.core.solver import LocalVRPSolver
+from src.celery_worker.celery_app import optimize_route_task
+from celery.result import AsyncResult
 
 # Setup Logger
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-@router.post("/optimize", response_model=OptimizationResponse)
+@router.post("/optimize", response_model=TaskResponse)
 @monitor_performance
 async def optimize_route(request: OptimizationRequest):
     """
-    Optimizes route using Google OR-Tools (Local Engine).
+    Submit optimization task to Celery (Async).
     """
-    logger.info("Starting local optimization with OR-Tools...")
-    start_total = time.perf_counter()
+    logger.info("Received optimization request. Enqueuing task...")
     
-    if not request.stops:
-         return OptimizationResponse(
-            route_id="empty", 
-            optimized_order=[], 
-            total_distance_km=0.0,
-            estimated_travel_time_minutes=0.0,
-            execution_time_seconds=0.0,
-            status="error_empty"
-        )
-    
-    # 1. Prepare Data for Solver
-    # Handle Explicit Depot logic
+    # 1. Prepare Data
     if request.depot:
-        # If depot is explicit, it becomes index 0
         all_points = [request.depot] + request.stops
     else:
-        # Legacy: request.stops[0] is the depot
         if not request.stops:
-             return OptimizationResponse(
-                route_id="empty", 
-                optimized_order=[], 
-                total_distance_km=0.0,
-                execution_time_seconds=0.0,
-                status="error_empty"
-            )
+             raise HTTPException(status_code=400, detail="No stops provided")
         all_points = request.stops
     
+    # Serialize to simple list of tuples for Celery (JSON serializable)
     locations = [(p.lat, p.lng) for p in all_points]
     
-    # 2. Initialize Solver
-    # We assume 1 Vehicle starting at index 0 (which is now correctly the depot)
-    solver = LocalVRPSolver(vehicles=1, depot=0)
+    # 2. Submit to Celery
+    task = optimize_route_task.delay(locations, depot_index=0)
     
-    # Run the math in a threadpool to avoid blocking the Async Event Loop
-    # (Constraint Solving is CPU intensive)
-    loop = asyncio.get_event_loop()
-    solution = await loop.run_in_executor(None, solver.solve, locations)
+    logger.info(f"Task Enqueued: {task.id}")
     
-    end_total = time.perf_counter()
-    duration = end_total - start_total
-    
-    # 3. Parse Result
-    if solution["status"] == "optimized":
-        # The solver returns indices [0, 2, 1, 3, 0].
-        # We match these back to the addresses in 'all_points'.
-        optimized_indices = solution["route_indices"]
-        final_addresses = [all_points[i].address for i in optimized_indices]
-        
-        # Calculate Estimated Time
-        # Assumption: Average City Speed = 25 km/h
-        avg_speed_kmh = 25.0
-        estimated_hours = solution["total_distance_km"] / avg_speed_kmh
-        estimated_minutes = round(estimated_hours * 60, 2)
-        
-        result = OptimizationResponse(
-            route_id=str(uuid.uuid4()),
-            optimized_order=final_addresses,
-            total_distance_km=round(solution["total_distance_km"], 2),
-            estimated_travel_time_minutes=estimated_minutes,
-            execution_time_seconds=duration,
-            status="optimized_local_ortools"
-        )
-        logger.info(f"Optimization successful: {solution['total_distance_km']} km")
-    else:
-        # Fallback if solver fails (rare for simple cases)
-        logger.warning("Solver found no solution.")
-        result = OptimizationResponse(
-            route_id="solver_fail",
-            optimized_order=[s.address for s in request.stops],
-            total_distance_km=0.0,
-            estimated_travel_time_minutes=0.0,
-            execution_time_seconds=duration,
-            status="no_solution"
-        )
+    return TaskResponse(
+        task_id=task.id,
+        status="PROCESSING"
+    )
 
-    # Audit Log
-    with MockStorageConnection() as storage:
-        storage.save_log(result.dict())
+@router.get("/tasks/{task_id}", response_model=TaskResult)
+async def get_task_status(task_id: str):
+    task_result = AsyncResult(task_id)
+    
+    if task_result.state == 'PENDING':
+        return TaskResult(task_id=task_id, status="PROCESSING")
+    
+    elif task_result.state == 'SUCCESS':
+        # Result is the dict returned by solver.solve()
+        solution = task_result.result
         
-    return result
+        # Reconstruct Response
+        # NOTE: In a real app we would persist 'all_points' to DB to map back addresses.
+        # For this demo, we can't map back addresses easily in a stateless GET.
+        # TRICK: We will return the raw indices and let the Frontend map them!
+        
+        # To make this robust without DB, we need the frontend to hold the state of "What stops did I send?"
+        # The solver returns: {"route_indices": [0, 2, 1, ...], "distance": ...}
+        
+        return TaskResult(
+            task_id=task_id,
+            status="SUCCESS",
+            result=OptimizationResponse(
+                route_id=str(uuid.uuid4()),
+                optimized_order=[str(i) for i in solution["route_indices"]], # Returning INDICES as strings
+                total_distance_km=round(solution["total_distance_km"], 2),
+                estimated_travel_time_minutes=round((solution["total_distance_km"]/25.0)*60, 2),
+                execution_time_seconds=0.0, # Not tracked in async same way
+                status="optimized_celery"
+            )
+        )
+        
+    elif task_result.state == 'FAILURE':
+        return TaskResult(task_id=task_id, status="FAILURE")
+    
+    return TaskResult(task_id=task_id, status="PROCESSING")
