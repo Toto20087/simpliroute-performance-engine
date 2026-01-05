@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Use environment variable or default to localhost
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:80/api/v1';
 
 export interface Stop {
     lat: number;

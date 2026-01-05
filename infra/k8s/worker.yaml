@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: simpliroute-worker
+  labels:
+    app: simpliroute-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: simpliroute-worker
+  template:
+    metadata:
+      labels:
+        app: simpliroute-worker
+    spec:
+      containers:
+      - name: simpliroute-worker
+        image: simpliroute-engine:v1
+        imagePullPolicy: Never
+        command: ["celery", "-A", "src.celery_worker.celery_app", "worker", "--loglevel=info"]
+        env:
+        - name: CELERY_BROKER_URL
+          value: "redis://redis:6379/0"
+        - name: CELERY_RESULT_BACKEND
+          value: "redis://redis:6379/0"
+        - name: PYTHONPATH
+          value: "/app"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "250m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"

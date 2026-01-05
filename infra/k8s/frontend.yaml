@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: simpliroute-frontend
+  labels:
+    app: simpliroute-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: simpliroute-frontend
+  template:
+    metadata:
+      labels:
+        app: simpliroute-frontend
+    spec:
+      containers:
+      - name: simpliroute-frontend
+        image: simpliroute-frontend:v1
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: simpliroute-frontend-service
+spec:
+  selector:
+    app: simpliroute-frontend
+  ports:
+    - protocol: TCP
+      port: 8501
+      targetPort: 80
+  type: LoadBalancer

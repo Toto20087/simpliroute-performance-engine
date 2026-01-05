@@ -23,11 +23,11 @@ El objetivo de construir esta demo fue enfrentarme a la realidad de las herramie
 
 ### 3. Infraestructura y Orquestación (Kubernetes)
 *   **Desafío**: El requisito de orquestar múltiples contenedores me llevó a una tecnología que desconocía: **Kubernetes**.
-*   **Aprendizaje**: Realicé una investigación intensiva sobre qué es, sus componentes (Pods, Services, Deployments) y cómo opera. Aunque para el entregable final opté por Docker Compose/Railway por agilidad, adquirí el conocimiento fundacional para escalar esta arquitectura a un clúster real.
+*   **Aprendizaje**: Investigué sus componentes y arquitectura. Implementé una solución completa con **Deployments**, **Services** y **HPA (Horizontal Pod Autoscaler)** para garantizar alta disponibilidad y escalabilidad automática según la carga de CPU.
 
-### 4. Visibilidad del Producto (Despliegue en Railway)
-*   **Objetivo**: Quería que el CTO pudiera auditar el funcionamiento real del sistema desde su computadora, sin necesidad de clonar el repo.
-*   **Solución**: Investigué plataformas de despliegue PaaS y configuré **Railway** para soportar la arquitectura multi-servicio (Frontend + Backend + Worker + Redis), logrando un link público de demostración totalmente funcional.
+### 4. Visibilidad del Producto (Despliegue)
+*   **Objetivo**: Permitir auditar el funcionamiento real del sistema de forma sencilla.
+*   **Solución**: Se configuraron pipelines de despliegue tanto locales (Docker Compose) como escalables (Kubernetes) para demostrar versatilidad.
 
 ---
 
@@ -44,5 +44,83 @@ El objetivo de construir esta demo fue enfrentarme a la realidad de las herramie
 *   **Leaflet**: Mapas interactivos.
 
 ### Infraestructura
-*   **Docker Compose**: Orquestación local.
-*   **Railway**: Despliegue en la nube.
+*   **Docker Compose**: Desarrollo local rápido.
+*   **Kubernetes (K8s)**: Orquestación escalable para producción.
+
+---
+
+## 🚀 Cómo Ejecutar el Proyecto
+
+A continuación se detallan las dos formas de levantar el proyecto: **Modo Desarrollo (Docker Compose)** y **Modo Producción Escalable (Kubernetes)**.
+
+### 📋 Requisitos Previos (Prerequisites)
+*   [Docker Desktop](https://www.docker.com) instalado y corriendo.
+*   (Solo para Opción 2) **Kubernetes** habilitado en Docker Desktop.
+*   (Solo para Opción 2) `kubectl` instalado (generalmente viene con Docker Desktop).
+
+---
+
+### Opción 1: Inicio Rápido con Docker Compose
+*Ideal para desarrollo local, pruebas rápidas y debugging.*
+
+1.  **Clonar el repositorio:**
+    ```bash
+    git clone <tu-repositorio>
+    cd simpliroute-performance-engine
+    ```
+
+2.  **Ejecutar el entorno:**
+    Este comando construye las imágenes y levanta todos los servicios (Frontend, Backend, Worker, Redis).
+    ```bash
+    docker-compose up --build
+    ```
+
+3.  **Acceder a la aplicación:**
+    *   **Frontend Web:** [http://localhost:8501](http://localhost:8501)
+    *   **API Docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
+
+4.  **Detener:** Presiona `Ctrl+C` o ejecuta `docker-compose down`.
+
+---
+
+### Opción 2: Despliegue Escalable con Kubernetes
+*Ideal para simular un entorno de producción con alta disponibilidad, balanceo de carga y auto-escalado.*
+
+**Nota Importante:** Si usas esta opción, asegúrate de que Docker Compose no esté corriendo (`docker-compose down`) para liberar los puertos.
+
+1.  **Construir las Imágenes Docker:**
+    Kubernetes necesita que las imágenes estén creadas y etiquetadas correctamente.
+    ```bash
+    # Construir imagen del Backend/Worker
+    docker build -t simpliroute-engine:v1 -f infra/docker/Dockerfile .
+
+    # Construir imagen del Frontend
+    docker build -t simpliroute-frontend:v1 ./src/frontend-react
+    ```
+
+2.  **Desplegar en Kubernetes:**
+    Este comando crea todos los recursos (Deployments, Services, HPA).
+    ```bash
+    kubectl apply -f infra/k8s/
+    ```
+
+3.  **Verificar el Estado:**
+    Comprueba que los pods estén corriendo (Status: `Running`).
+    ```bash
+    kubectl get pods
+    ```
+
+4.  **Acceder a la aplicación:**
+    *   **Frontend Web:** [http://localhost:8501](http://localhost:8501) (Puerto expuesto por el LoadBalancer).
+    *   **API Docs:** [http://localhost:80/docs](http://localhost:80/docs) (Puerto estándar 80).
+
+5.  **Detener y Limpiar:**
+    Para borrar todos los recursos creados en el clúster.
+    ```bash
+    kubectl delete -f infra/k8s/
+    ```
+
+### ✨ Características del Despliegue en Kubernetes
+*   **Alta Disponibilidad:** 3 réplicas del Backend corriendo simultáneamente.
+*   **Auto-Escalado (HPA):** Si el uso de CPU supera el 50%, el sistema crea automáticamente más réplicas (hasta 10) para soportar el tráfico.
+*   **Load Balancing:** Distribución inteligente del tráfico entre las réplicas disponibles.

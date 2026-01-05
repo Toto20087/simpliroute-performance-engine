@@ -27,6 +27,11 @@ spec:
           limits:
             memory: "256Mi"
             cpu: "500m"
+        env:
+        - name: CELERY_BROKER_URL
+          value: "redis://redis:6379/0"
+        - name: CELERY_RESULT_BACKEND
+          value: "redis://redis:6379/0"
         livenessProbe:
           httpGet:
             path: /health
